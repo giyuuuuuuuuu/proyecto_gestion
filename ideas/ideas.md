@@ -61,11 +61,11 @@ Objetivo: tener algo funcionando en **1–2 días** de trabajo tranquilo.
 
 ### Fase 0 — Preparación (30–45 min)
 
-- [ ] Crear entorno virtual Python (`venv`).
-- [ ] Instalar dependencias: `flask`, `psycopg2-binary`, `bcrypt`, `python-dotenv`.
-- [ ] Crear base de datos en PostgreSQL y usuario de la app.
-- [ ] Archivo `.env` con `DATABASE_URL` y `SECRET_KEY`.
-- [ ] Estructura mínima de carpetas (ver abajo).
+- [x] Crear entorno virtual Python (`venv`).
+- [x] Instalar dependencias: `flask`, `psycopg2-binary`, `bcrypt`, `python-dotenv`.
+- [ ] Crear base de datos en PostgreSQL y usuario de la app (`.\scripts\setup_postgres.ps1`).
+- [x] Archivo `.env` con `DATABASE_URL` y `SECRET_KEY`.
+- [x] Estructura mínima de carpetas (ver abajo).
 
 ### Fase 1 — Esqueleto web (1–2 h)
 
