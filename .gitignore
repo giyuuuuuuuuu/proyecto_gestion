@@ -10,7 +10,7 @@ __pycache__/
 .env
 
 # Borrador interno de documentación (no subir al repo)
-borrador_documento.md
+
 
 # IDE / OS
 .idea/
