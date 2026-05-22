@@ -12,13 +12,26 @@ No se trata de construir una aplicación grande. El foco es **infraestructura de
 
 **Duración orientativa:** 2–3 semanas (o 5–8 sesiones de laboratorio) según profundidad del pentest y del modo IPS.
 
+**Guías paso a paso:** [`fases/`](../fases/README.md) · **Scripts y Syslog:** [`lab/`](../lab/README.md)
+
+---
+
+## Mejoras recomendadas por el tutor (aplicadas en este plan)
+
+| Mejora | Por qué |
+|--------|---------|
+| **Suricata en pfSense** (Package Manager) | Evita una VM IDS dedicada; el sensor ve el tráfico real del firewall |
+| **Vulnerabilidades intencionadas** en DMZ/LAN | Debian/nginx/PostgreSQL actualizados no dan hallazgos al pentest automatizado |
+| **Syslog centralizado** (VM o contenedor Docker) | Correlacionar logs de pfSense + Suricata en un solo sitio |
+| **Script de ataque en Kali** | Reproducible: escaneo agresivo Nmap + pruebas web/SSH → alertas IDS |
+
 ---
 
 ## Alcance mínimo (qué debe quedar demostrado)
 
 | Bloque | Entregable mínimo |
 |--------|-------------------|
-| IDS/IPS | Suricata o Snort instalado, reglas activas, al menos **5 alertas** reproducibles y documentadas |
+| IDS/IPS | Suricata en **pfSense** (paquete oficial), reglas activas, al menos **5 alertas** reproducibles y documentadas |
 | Firewall | pfSense (o HW) con **≥10 reglas** justificadas (WAN/LAN/DMZ, NAT, bloqueos) |
 | Auditoría | Informe con metodología, **≥8 hallazgos** (red + servicios), mitigaciones priorizadas |
 
@@ -29,82 +42,127 @@ No se trata de construir una aplicación grande. El foco es **infraestructura de
 Laboratorio en **máquinas virtuales** (VirtualBox, VMware o Proxmox). Todas en una red interna aislada del router doméstico (modo host-only / red interna).
 
 ```
-                    [ Internet simulada ]
-                            |
-                     +-------------+
-                     |   pfSense   |  ← Firewall perimetral (WAN / LAN / DMZ)
-                     +------+------+
-                            |
-          +-----------------+------------------+
-          |                 |                  |
-    +-----+-----+     +-----+-----+      +-----+-----+
-    |  WAN      |     |  LAN      |      |  DMZ      |
-    | (ataque)  |     | corp.     |      | servicios |
-    +-----------+     +-----+-----+      +-----+-----+
-                            |                  |
-                     +------+------+    +------+------+
-                     | Suricata/   |    | Servidor  |
-                     | Snort IDS   |    | web (HTTP) |
-                     | (sensor)    |    | + opcional |
-                     +-------------+    | app Flask  |
-                            |           +------------+
-                     +------+------+
-                     | Estación    |
-                     | admin / SIEM|
-                     | (logs)      |
-                     +-------------+
+                         [ Internet simulada ]
+                                 |
+                          +-------------+
+                          |   pfSense   |
+                          |  Firewall   |
+                          | + Suricata  |  ← IDS/IPS (paquete oficial)
+                          +------+------+
+                                 |
+           +---------------------+---------------------+
+           |                     |                     |
+     +-----+-----+         +-----+-----+       +-----+-----+
+     |   WAN     |         |   LAN     |       |   DMZ     |
+     |  Kali     |         | corp.     |       | web vuln. |
+     +-----------+         +-----+-----+       +-----------+
+                                 |                     |
+                          +------+------+      srv-dmz (nginx+PHP)
+                          | srv-syslog  |      fallos intencionados
+                          |  o Docker   |
+                          +-------------+
+                                 ^
+                    logs UDP 514 (pfSense + Suricata)
 ```
 
-### Roles de cada VM (plantilla)
+### Roles de cada VM (plantilla actualizada)
 
-| VM | SO sugerido | Rol | IP ejemplo (LAN) |
-|----|-------------|-----|-------------------|
-| `fw-pfsense` | pfSense CE | Firewall perimetral, NAT, reglas | WAN `10.0.0.1`, LAN `192.168.10.1`, DMZ `192.168.20.1` |
-| `ids-suricata` | Debian / Ubuntu | IDS (y opcional IPS en modo inline) | `192.168.10.10` |
-| `srv-dmz` | Debian | Servidor web corporativo (nginx o Apache) | `192.168.20.10` |
-| `srv-db` | Debian | PostgreSQL **solo en LAN** (no expuesto a WAN) | `192.168.10.20` |
-| `ws-corp` | Windows o Linux | Cliente interno (usuario corporativo) | `192.168.10.50` |
-| `kali-pentest` | Kali Linux | Máquina de auditoría (solo en laboratorio) | WAN `10.0.0.50` |
+| VM | SO sugerido | Rol | IP ejemplo |
+|----|-------------|-----|------------|
+| `fw-pfsense` | pfSense CE | Firewall + **Suricata** (Package Manager) + envío Syslog | WAN `10.0.0.1`, LAN `192.168.10.1`, DMZ `192.168.20.1` |
+| `srv-syslog` | Debian **o** Docker en host | Centralizar logs pfSense + Suricata | LAN `192.168.10.5` |
+| `srv-dmz` | Debian | Web con **vulnerabilidades de práctica** (ver `lab/scripts/seed-vulnerabilities.sh`) | DMZ `192.168.20.10` |
+| `srv-db` | Debian | PostgreSQL en LAN; contraseña débil **solo para el lab** | LAN `192.168.10.20` |
+| `ws-corp` | Linux opcional | Cliente interno | LAN `192.168.10.50` |
+| `kali-pentest` | Kali Linux | Pentest; script `lab/scripts/attack-lab.sh` | WAN `10.0.0.50` |
+
+> **Ya no hace falta** la VM `ids-suricata` dedicada: Suricata corre dentro de pfSense y inspecciona WAN/DMZ/LAN según configures las interfaces en el paquete.
 
 **Regla de oro:** PostgreSQL y datos sensibles **nunca** en DMZ ni con puerto abierto en WAN. El acceso desde Internet solo a servicios publicados en DMZ (p. ej. HTTP/HTTPS).
 
-**Opcional:** reutilizar el mini gestor Flask del otro proyecto (`ideas/ideas.md`) como **aplicación corporativa** en `srv-dmz` o en LAN detrás de reverse proxy; así el pentest puede incluir pruebas web además de red.
+**Opcional:** reutilizar el mini gestor Flask del otro proyecto (`ideas/ideas.md`) como **aplicación corporativa** en LAN; mantener en DMZ el servidor vulnerable del script para que Kali tenga hallazgos claros.
 
 ---
 
-## Bloque 1 — IDS/IPS (Suricata o Snort)
+## Vulnerabilidades intencionadas (obligatorio para el pentest)
 
-### Elección de herramienta
+Un Debian/nginx/PostgreSQL **parcheados** apenas generan hallazgos con Kali automatizado. El lab debe incluir fallos **controlados y documentados** (solo en VMs del ejercicio):
 
-| Herramienta | Cuándo elegirla |
-|-------------|-----------------|
-| **Suricata** | Recomendada: IDS/IPS multihilo, buena integración con reglas ET/Open, IPS en inline con `NFQUEUE` |
-| **Snort** | Válida si el curso lo exige; misma lógica de despliegue y documentación |
+| Activo | Fallo de práctica | Herramienta que lo detecta | Hallazgo informe |
+|--------|-------------------|----------------------------|------------------|
+| `srv-dmz` | PHP `search.php` sin sanitizar (SQLi/XSS reflejado) | `attack-lab.sh`, nikto | H-web-01 |
+| `srv-dmz` | `/backup/` con autoindex | gobuster / curl | H-web-02 |
+| `srv-dmz` | `phpinfo.php` expuesto | nikto | H-web-03 |
+| `srv-dmz` | SSH usuario `lab` / `lab123` | hydra, Suricata brute | H-ssh-01 |
+| `srv-dmz` | FTP anónimo (vsftpd) | nmap, Suricata | H-ftp-01 |
+| `srv-dmz` | `server_tokens on` (banner nginx) | nmap -sV | H-web-04 |
+| `srv-db` | Contraseña débil en `lab_app` | hydra desde LAN | H-db-01 |
+| `fw-pfsense` | Regla temporal demasiado abierta (antes de mitigar) | revisión manual | H-fw-01 |
 
-En el documento y la memoria, **fijar una** y ser consistente.
+**Sembrar vulnerabilidades:** en `srv-dmz` ejecutar [`lab/scripts/seed-vulnerabilities.sh`](../lab/scripts/seed-vulnerabilities.sh). En `srv-db`:
 
-### Modos de despliegue (elegir uno y documentarlo)
+```bash
+sudo -u postgres psql -c "ALTER USER lab_app PASSWORD '1234';"
+```
 
-1. **IDS pasivo (recomendado para empezar)**  
-   - Sensor en LAN con copia de tráfico (port mirroring en virtual switch, o `span` en pfSense si está disponible).  
-   - No bloquea; solo genera alertas.  
-   - Menor riesgo de cortar el laboratorio por falsos positivos.
+En la memoria, dejar claro que son **vulnerabilidades introducidas a propósito** para practicar detección y mitigación.
 
-2. **IPS inline (opcional / avanzado)**  
-   - Suricata entre segmentos o en bridge; acción `drop`/`reject` en reglas.  
-   - Demostrar **una** prevención real (p. ej. bloqueo de escaneo agresivo o exploit conocido en tráfico de prueba).
+---
+
+## Syslog centralizado (plus)
+
+Objetivo: ver en un solo sitio eventos de **firewall** y **Suricata**.
+
+**Opción A — Contenedor Docker** (en el PC host con IP en LAN, ej. `192.168.10.2`):
+
+```bash
+cd lab && docker compose -f docker-compose.syslog.yml up -d
+```
+
+**Opción B — VM `srv-syslog`** (`192.168.10.5`) con `rsyslog` escuchando UDP/TCP 514.
+
+**En pfSense:**
+
+- **Status → System Logs → Settings** → Remote Logging → `192.168.10.5` (o IP del host Docker), puerto **514 UDP**.
+- **Services → Suricata → Interfaces → WAN** (y DMZ) → habilitar **Send Alerts to System Log** y, si existe, **Syslog output**.
+
+Correlacionar: hora del `attack-lab.sh` ↔ línea en `/var/log/suricata-remote.log` o Alerts en GUI.
+
+---
+
+## Bloque 1 — IDS/IPS (Suricata en pfSense)
+
+### Despliegue recomendado: paquete oficial en pfSense
+
+1. **System → Package Manager → Available Packages** → instalar **Suricata**.
+2. **Services → Suricata → Interfaces** — habilitar inspección en **WAN** y **DMZ** (y LAN si quieres ver tráfico interno).
+3. **WAN Preview** o modo **IPS** según versión del paquete (empezar en **IDS** si temes cortar tráfico).
+4. Actualizar reglas: pestaña **Updates** → **Emerging Threats Open** (o ruleset del curso).
+5. **Global Settings** — definir redes:
+   - `HOME_NET`: `192.168.10.0/24,192.168.20.0/24`
+   - `EXTERNAL_NET`: `10.0.0.0/24` (WAN simulada con Kali)
+6. **Alerts** — dejar habilitado el log; enviar copia a Syslog (bloque Syslog más abajo).
+
+### Reglas personalizadas en pfSense
+
+En **Suricata → WAN → Rules → Custom rules** (o archivo Includes), añadir por ejemplo:
+
+```
+alert tcp $EXTERNAL_NET any -> $HOME_NET 5432 (msg:"LAB Acceso PostgreSQL desde exterior"; sid:9000001; rev:1;)
+alert tcp 10.0.0.50 any -> $HOME_NET any (msg:"LAB Escaneo desde Kali"; flags:S; threshold:type both, track by_src, count 25, seconds 10; sid:9000002; rev:1;)
+```
+
+### Script de ataque reproducible (Kali)
+
+Usar [`lab/scripts/attack-lab.sh`](../lab/scripts/attack-lab.sh): escaneo **agresivo** Nmap (`-T4 -p-`), nikto, rutas web vulnerables, SQLi de prueba y hydra SSH acotado. Ejecutar **después** de sembrar vulnerabilidades.
 
 ### Tareas concretas
 
-- [ ] Instalar Suricata o Snort en `ids-suricata`.
-- [ ] Actualizar reglas (**Emerging Threats Open** o conjunto que proporcione el profesor).
-- [ ] Configurar `HOME_NET` y `EXTERNAL_NET` acorde a la topología (`192.168.10.0/24`, `192.168.20.0/24`, `10.0.0.0/24`).
-- [ ] Activar logging en archivo y/o **Syslog** hacia la estación de administración.
-- [ ] Crear **≥2 reglas personalizadas** (local.rules), por ejemplo:
-  - Detección de muchos intentos fallidos SSH desde WAN.
-  - Detección de tráfico hacia PostgreSQL (`5432`) desde WAN o DMZ.
-  - Alerta por escaneo de puertos (nmap) desde `kali-pentest`.
-- [ ] Reproducir ataques de laboratorio y capturar **≥5 alertas** distintas (captura de pantalla + línea del log + timestamp).
+- [ ] Instalar paquete **Suricata** en pfSense (no VM IDS separada salvo que el profesor exija lo contrario).
+- [ ] Actualizar reglas ET/Open desde la GUI de Suricata.
+- [ ] Configurar `HOME_NET` / `EXTERNAL_NET` acorde a la topología.
+- [ ] Crear **≥2 reglas personalizadas** en Suricata (ejemplos arriba).
+- [ ] Ejecutar `attack-lab.sh` desde Kali y capturar **≥5 alertas** en **Services → Suricata → Alerts** (+ copia en Syslog).
 
 ### Escenarios de prueba para generar alertas (ética: solo en tu lab)
 
@@ -118,9 +176,10 @@ En el documento y la memoria, **fijar una** y ser consistente.
 
 ### Evidencias Bloque 1
 
-- Fragmento de `suricata.yaml` / `snort.conf` con redes definidas.
-- Archivo `local.rules` con reglas propias comentadas.
-- 5 capturas o extractos de `fast.log` / `eve.json` con explicación en español.
+- Captura **Package Manager** con Suricata instalado.
+- Captura **Suricata → Alerts** tras ejecutar `attack-lab.sh`.
+- Reglas custom pegadas en la memoria (sid 9000001, 9000002).
+- Extracto del **Syslog** centralizado correlacionado con el ataque.
 
 ---
 
@@ -139,15 +198,15 @@ Plantilla de reglas que el ejercicio debe implementar y explicar en la memoria:
 | # | Acción | Interfaz | Origen | Destino | Puerto/servicio | Justificación |
 |---|--------|----------|--------|---------|-----------------|---------------|
 | 1 | Block | WAN | any | LAN net | any | Aislar red interna desde Internet |
-| 2 | Block | WAN | any | DMZ | any excepto 80/443 | Solo servicios publicados |
-| 3 | Pass | WAN | Kali IP | DMZ | 80, 443 | Simular acceso público al portal |
+| 2 | Block | WAN | any | DMZ | any | Bloqueo por defecto hacia DMZ |
+| 3 | Pass | WAN | Kali IP | DMZ | 80, 443, 21, 22 | Portal + SSH/FTP mal expuestos (vuln. práctica) |
 | 4 | Pass | LAN | LAN net | DMZ | 80, 443 | Empleados acceden al portal |
 | 5 | Block | DMZ | DMZ net | LAN net | any | DMZ no inicia hacia LAN |
 | 6 | Pass | LAN | LAN net | srv-db | 5432 | App/servicios internos a BD |
 | 7 | Block | DMZ | any | srv-db | 5432 | La BD no es alcanzable desde DMZ |
 | 8 | Block | WAN | any | srv-db | 5432 | BD nunca expuesta |
 | 9 | Pass | LAN | LAN net | any | 53, 123 | DNS/NTP internos si aplica |
-| 10 | Pass | LAN | ids-suricata | any | Syslog 514 | Centralizar logs del IDS |
+| 10 | Pass | LAN | srv-syslog | any | Syslog 514 | Centralizar logs firewall + Suricata |
 | 11 | Alias + Block | WAN | `bogons` o geo | any | any | Bloquear rangos no enrutables (avanzado) |
 | 12 | NAT | WAN | — | DMZ web | 80→80 | Publicación controlada del servicio |
 
@@ -155,7 +214,7 @@ Plantilla de reglas que el ejercicio debe implementar y explicar en la memoria:
 
 - Reglas basadas en **alias** (grupos de IPs de administración vs resto LAN).
 - **Schedule** (horario laboral) para restringir gestión del firewall.
-- **Suricata package** en pfSense como alternativa al sensor externo (documentar si se usa en lugar de VM dedicada).
+- **Suricata package** en pfSense (despliegue **principal** de este plan).
 
 ### Evidencias Bloque 2
 
@@ -175,13 +234,11 @@ Seguir un ciclo claro, aunque sea simplificado:
 Reconocimiento → Escaneo → Enumeración → Explotación (controlada) → Post-explotación (ligera) → Informe → Mitigación
 ```
 
-Herramientas típicas en **Kali** (solo contra tu lab):
+Herramientas en **Kali** (solo contra tu lab):
 
-- `nmap`, `masscan` (con moderación)
-- `nikto`, `dirb` o `gobuster` (servicio web DMZ)
-- `hydra` o `ncrack` (fuerza bruta **limitada**, con autorización escrita del profesor)
-- `sqlmap` solo si hay vulnerabilidad intencional de práctica
-- `wireshark` / `tcpdump` para correlacionar con alertas IDS
+- **[`lab/scripts/attack-lab.sh`](../lab/scripts/attack-lab.sh)** — escaneo agresivo Nmap + nikto + curl SQLi + hydra acotado (punto de partida del pentest)
+- `sqlmap` contra `search.php` si quieres profundizar un hallazgo
+- `wireshark` / `tcpdump` para correlacionar con alertas Suricata y Syslog
 
 ### Checklist de auditoría de red corporativa
 
@@ -248,17 +305,18 @@ Incluir **recomendaciones organizativas** breves: política de cambios en reglas
 - [ ] Configurar las ≥10 reglas y NAT.
 - [ ] Probar conectividad básica (ping/curl) desde cada zona.
 
-### Fase 2 — Servicios corporativos (1 sesión)
+### Fase 2 — Servicios + vulnerabilidades de práctica (1 sesión)
 
-- [ ] Levantar servidor web en DMZ.
-- [ ] Levantar PostgreSQL solo en LAN (opcional: app Flask en LAN o detrás de proxy).
-- [ ] Confirmar que WAN no alcanza la BD.
+- [ ] Levantar servidor web en DMZ y ejecutar `seed-vulnerabilities.sh`.
+- [ ] Levantar PostgreSQL en LAN con contraseña débil documentada.
+- [ ] Confirmar que WAN no alcanza la BD (antes de mitigar).
 
-### Fase 3 — IDS/IPS (2 sesiones)
+### Fase 3 — IDS/IPS en pfSense + Syslog (1–2 sesiones)
 
-- [ ] Instalar y afinar Suricata o Snort.
+- [ ] Instalar paquete Suricata en pfSense.
 - [ ] Reglas ET/Open + reglas custom.
-- [ ] Generar y documentar alertas.
+- [ ] Syslog centralizado (Docker o srv-syslog).
+- [ ] Ejecutar `attack-lab.sh` y documentar alertas.
 
 ### Fase 4 — Pentest y informe (2 sesiones)
 
@@ -325,10 +383,11 @@ Son **complementarios**, no sustitutos:
 
 ## Siguiente paso concreto
 
-1. Confirmar hipervisor y si se usará **Suricata** o **Snort**.
-2. Crear las VMs según la tabla de roles e IPs.
-3. Montar pfSense y validar segmentación antes de instalar el IDS.
-4. Ejecutar el primer escaneo desde Kali y verificar que **pfSense bloquea** y **Suricata alerta**.
-5. Redactar el informe de hallazgos mientras se aplican mitigaciones (no dejar el informe para el final).
+1. Confirmar hipervisor; **Suricata irá en pfSense** (no VM IDS salvo excepción del profesor).
+2. Crear VMs: pfSense, srv-dmz, srv-db, srv-syslog (o Docker), Kali.
+3. Montar pfSense, reglas y paquete Suricata.
+4. Sembrar vulnerabilidades (`seed-vulnerabilities.sh`) y ejecutar `attack-lab.sh` desde Kali.
+5. Verificar bloqueo en firewall, alertas en Suricata y líneas en Syslog.
+6. Redactar informe con hallazgos reales y mitigaciones.
 
-Cuando pases de documentación a implementación, se puede añadir al repo una carpeta `lab/` con diagramas, exports de reglas y plantilla del informe de pentest.
+Implementación: **[`fases/`](../fases/README.md)** · Scripts: **[`lab/`](../lab/README.md)**.
