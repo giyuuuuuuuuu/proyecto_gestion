@@ -188,3 +188,28 @@ No invertir el orden: primero que **sin login no se vea nada de la BBDD**, luego
 4. Implementar login antes de cualquier consulta a `tasks`.
 
 Cuando quieras pasar de ideas a código, se puede montar el esqueleto de la Fase 0 y 1 en una sola sesión.
+
+Fases del proyecto (plan de trabajo)
+Fase 0 — Preparación (1 sesión)
+ Instalar hipervisor y descargar ISOs (pfSense, Debian, Kali).
+ Definir tabla de IPs y nombres de hosts.
+ Crear red interna aislada (sin exponer el lab a Internet real sin control).
+Fase 1 — Red y firewall (2 sesiones)
+ Desplegar pfSense con WAN/LAN/DMZ.
+ Configurar las ≥10 reglas y NAT.
+ Probar conectividad básica (ping/curl) desde cada zona.
+Fase 2 — Servicios corporativos (1 sesión)
+ Levantar servidor web en DMZ.
+ Levantar PostgreSQL solo en LAN (opcional: app Flask en LAN o detrás de proxy).
+ Confirmar que WAN no alcanza la BD.
+Fase 3 — IDS/IPS (2 sesiones)
+ Instalar y afinar Suricata o Snort.
+ Reglas ET/Open + reglas custom.
+ Generar y documentar alertas.
+Fase 4 — Pentest y informe (2 sesiones)
+ Ejecutar pruebas desde Kali siguiendo metodología.
+ Redactar informe con ≥8 hallazgos.
+ Aplicar mitigaciones y volver a probar (estado Mitigado).
+Fase 5 — Defensa oral / entrega final (1 sesión)
+ Presentar topología, demo en vivo de bloqueo firewall + alerta IDS.
+ Entregar paquete de evidencias (PDF o wiki del repo).

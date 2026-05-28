@@ -4,7 +4,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from db import get_connection
+from repuesto.db import get_connection
 
 
 def main() -> int:

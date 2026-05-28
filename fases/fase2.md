@@ -110,11 +110,18 @@ nmap -p 5432 -Pn 192.168.10.20
 - [ ] Guardar las tres salidas en `lab/evidencias/fase2/segmentacion-bd.txt`.
 - [ ] Captura de reglas pfSense #6, #7, #8 aplicadas.
 
-### 2.5 — Endurecimiento básico de servicios
+### 2.5 — Qué NO endurecer todavía (importante)
 
-- [ ] `srv-dmz`: deshabilitar SSH desde WAN (si SSH existe, solo desde LAN con regla futura).
-- [ ] Ocultar versión nginx en `nginx.conf` (`server_tokens off;`) — hallazgo menor para Fase 4.
-- [ ] `srv-db`: no instalar paquetes innecesarios; firewall local opcional (`ufw allow from 192.168.10.0/24 to any port 5432`).
+Las vulnerabilidades deben seguir activas **hasta terminar el pentest (Fase 4)**:
+
+- [ ] **No** cerrar SSH (22) ni FTP (21) en DMZ antes del pentest — son hallazgos H-02 / FTP.
+- [ ] **No** ejecutar `server_tokens off` ni parchear PHP hasta la fase de mitigación.
+- [ ] **No** cambiar la contraseña débil de PostgreSQL hasta documentar el hallazgo en Fase 4.
+
+**Sí hacer ahora (sin romper el pentest):**
+
+- [ ] `srv-db`: no instalar paquetes innecesarios; `ufw` solo si no bloquea LAN `192.168.10.0/24`.
+- [ ] Documentar en `vulnerabilidades-intencionadas.md` que los fallos son **intencionados**.
 
 ### 2.6 — Inventario de activos (inicio del informe)
 
@@ -162,4 +169,4 @@ Crear `lab/evidencias/fase2/inventario-activos.md`:
 ---
 
 **Anterior:** [fase1.md](fase1.md)  
-**Siguiente:** [fase3.md](fase3.md) — IDS/IPS con Suricata o Snort.
+**Siguiente:** [fase3.md](fase3.md) — IDS/IPS con Suricata en pfSense.

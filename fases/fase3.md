@@ -85,7 +85,8 @@ sudo apt install -y rsyslog
 - [ ] **Save**
 - [ ] Regla firewall LAN → srv-syslog puerto 514 (ver [fase1](fase1.md) regla #10)
 
-- [ ] Comprobar que llegan líneas tras un bloqueo o alerta Suricata.
+- [ ] Comprobar que llegan líneas tras un bloqueo de firewall o alerta Suricata.
+- [ ] Confirmar que alertas Suricata llegan al syslog remoto (vía system log de pfSense con *Send Alerts to System Log* activo).
 
 ### 3.8 — Ejecutar script de ataque (Kali)
 
@@ -114,11 +115,17 @@ sudo lab/scripts/attack-lab.sh 192.168.20.10 192.168.10.20
 - [ ] Mismo instante: intento a `5432` desde Kali → **bloqueo** en Firewall Log + alerta sid **9000001**.
 - [ ] Captura triple en `lab/evidencias/fase3/correlacion.png` o tres extractos de texto.
 
-### 3.10 — IPS (opcional)
+### 3.10 — IPS: prevención (obligatorio para el enunciado)
 
-- [ ] Cambiar WAN a modo **IPS** y bloquear categoría **scan** o regla custom con `drop`.
-- [ ] Repetir `nmap -T4` y demostrar que el escaneo se corta o disminuye.
-- [ ] Documentar riesgo de falsos positivos.
+El temario pide **detección y prevención**. Además del modo IDS (alertas), demuestra **IPS**:
+
+- [ ] En **WAN** (o DMZ): cambiar a modo **IPS** tras haber validado IDS.
+- [ ] Activar bloqueo de categoría **scan** o regla custom con `drop`/`reject`.
+- [ ] Ejecutar desde Kali: `nmap -T4 -p 1-1000 192.168.20.10` y documentar:
+  - **Antes (IDS):** alerta pero el escaneo avanza.
+  - **Después (IPS):** conexiones cortadas o escaneo claramente más lento/bloqueado.
+- [ ] Captura en `lab/evidencias/fase3/ips-prevencion.md` (antes/después).
+- [ ] Si un falso positivo corta el portal web, volver a IDS y documentar el riesgo en la memoria.
 
 ---
 
@@ -129,7 +136,8 @@ sudo lab/scripts/attack-lab.sh 192.168.20.10 192.168.10.20
 - [ ] ≥2 reglas custom (sid 900000x).
 - [ ] `attack-lab.sh` ejecutado sin errores críticos.
 - [ ] ≥5 alertas documentadas.
-- [ ] Syslog recibiendo eventos de pfSense (plus).
+- [ ] Syslog recibiendo eventos de pfSense **y** alertas Suricata (plus tutor).
+- [ ] Modo **IPS** demostrado con al menos 1 prueba antes/después (enunciado “prevención”).
 
 ---
 

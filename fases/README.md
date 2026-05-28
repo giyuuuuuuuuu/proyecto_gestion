@@ -2,6 +2,8 @@
 
 Guías paso a paso para implementar [`ideas/idea_2.md`](../ideas/idea_2.md).
 
+**¿Cumple el enunciado y el tutor?** → [`CUMPLIMIENTO.md`](CUMPLIMIENTO.md)
+
 ## Orden de trabajo
 
 ```
