@@ -9,8 +9,10 @@ __pycache__/
 # Variables de entorno (credenciales)
 .env
 
-# Borrador interno de documentación (no subir al repo)
-
+# Evidencias generadas por los scripts de ataque (pesadas / locales)
+lab/scripts/evidencias-exploit-*/
+lab/scripts/lab-evidencias-ataque-*/
+lab-evidencias-final/
 
 # IDE / OS
 .idea/

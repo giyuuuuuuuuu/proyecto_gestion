@@ -1,0 +1,35 @@
+# =============================================================================
+# suricata-custom.rules — Reglas personalizadas para el laboratorio
+# Detectan ataques contra las vulnerabilidades intencionadas (V-01..V-07).
+#
+# Instalación en pfSense:
+#   Services > Suricata > (interfaz WAN/DMZ) > Custom Rules  -> pegar este contenido
+#   o subir el fichero y "Apply". Reiniciar el sensor de la interfaz.
+#
+# Rango de SID local reservado: 9000001 - 9000099 (no choca con ET/Open).
+# IPs del lab: srv-db = 192.168.10.20 (LAN) ; srv-dmz web = 192.168.20.10 (DMZ).
+# =============================================================================
+
+# --- V-06 / segmentación: cualquier intento hacia PostgreSQL (5432) ----------
+alert tcp any any -> 192.168.10.20 5432 (msg:"LAB V-06 Intento de acceso a PostgreSQL (5432)"; flow:to_server; classtype:attempted-recon; sid:9000001; rev:1;)
+
+# --- V-01: SQL Injection en /search.php --------------------------------------
+alert http any any -> 192.168.20.10 80 (msg:"LAB V-01 SQLi en search.php (OR 1=1)"; flow:to_server,established; http.uri; content:"/search.php"; nocase; http.uri; content:"OR"; nocase; pcre:"/(\%27|\')\s*OR\s*(\%27|\')?1(\%27|\')?\s*=\s*(\%27|\')?1/i"; classtype:web-application-attack; sid:9000002; rev:1;)
+
+# --- V-01: XSS reflejado en /search.php --------------------------------------
+alert http any any -> 192.168.20.10 80 (msg:"LAB V-01 XSS reflejado en search.php (<script>)"; flow:to_server,established; http.uri; content:"/search.php"; nocase; http.uri; content:"script"; nocase; pcre:"/(\%3C|<)\s*script/i"; classtype:web-application-attack; sid:9000003; rev:1;)
+
+# --- V-02: acceso al directorio /backup/ -------------------------------------
+alert http any any -> 192.168.20.10 80 (msg:"LAB V-02 Acceso a /backup/ (autoindex)"; flow:to_server,established; http.method; content:"GET"; http.uri; content:"/backup/"; nocase; classtype:policy-violation; sid:9000004; rev:1;)
+
+# --- V-03: acceso a phpinfo.php ----------------------------------------------
+alert http any any -> 192.168.20.10 80 (msg:"LAB V-03 Acceso a phpinfo.php (fuga de info)"; flow:to_server,established; http.uri; content:"phpinfo.php"; nocase; classtype:policy-violation; sid:9000005; rev:1;)
+
+# --- V-04: fuerza bruta SSH (muchos intentos en poco tiempo) ------------------
+alert tcp any any -> 192.168.20.10 22 (msg:"LAB V-04 Posible fuerza bruta SSH (umbral)"; flow:to_server; flags:S; threshold:type both, track by_src, count 5, seconds 30; classtype:attempted-admin; sid:9000006; rev:1;)
+
+# --- V-05: FTP login anónimo -------------------------------------------------
+alert tcp any any -> 192.168.20.10 21 (msg:"LAB V-05 FTP login anonymous"; flow:to_server,established; content:"USER"; nocase; content:"anonymous"; nocase; distance:0; classtype:policy-violation; sid:9000007; rev:1;)
+
+# --- V-07 / recon: escaneo de puertos sobre la web DMZ -----------------------
+alert tcp any any -> 192.168.20.10 [21,22,80,443] (msg:"LAB V-07 Escaneo de puertos a DMZ web"; flags:S; threshold:type both, track by_src, count 10, seconds 20; classtype:attempted-recon; sid:9000008; rev:1;)

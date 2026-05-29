@@ -1,1 +1,0 @@
--- Fase 2: tablas users y tasks (pendiente de aplicar)
